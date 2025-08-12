@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jackpot City - Casino Virtual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+  /* Reset */
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+  }
+  body {
+    background: radial-gradient(circle at center, #1a0a00 0%, #000000 80%);
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  header {
+    margin-top: 40px;
+    text-align: center;
+  }
+  .logo {
+    font-size: 4rem;
+    color: #ffd700;
+    text-shadow:
+      0 0 5px #ffea00,
+      0 0 10px #ffea00,
+      0 0 20px #ffbb00,
+      0 0 30px #ffbb00,
+      0 0 40px #ff9500,
+      0 0 55px #ff9500,
+      0 0 75px #ff6a00;
+    animation: neonPulse 2.5s infinite alternate;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+  }
+  @keyframes neonPulse {
+    0% {
+      text-shadow:
+        0 0 10px #ffea00,
+        0 0 20px #ffea00,
+        0 0 30px #ffbb00,
+        0 0 40px #ffbb00,
+        0 0 50px #ff9500,
+        0 0 60px #ff9500,
+        0 0 70px #ff6a00;
+    }
+    100% {
+      text-shadow:
+        0 0 20px #fff700,
+        0 0 30px #fff700,
+        0 0 40px #ffbb00,
+        0 0 50px #ffbb00,
+        0 0 60px #ff9500,
+        0 0 70px #ff9500,
+        0 0 80px #ff6a00;
+    }
+  }
+  .icon {
+    font-size: 4rem;
+    filter: drop-shadow(0 0 6px #ffae00);
+    animation: iconGlow 2.5s infinite alternate;
+  }
+  @keyframes iconGlow {
+    0% { filter: drop-shadow(0 0 4px #ffae00); }
+    100% { filter: drop-shadow(0 0 10px #ffae00); }
+  }
+  main {
+    margin-top: 60px;
+    width: 90%;
+    max-width: 900px;
+    background: linear-gradient(135deg, #000000cc 0%, #1a0a00cc 100%);
+    border-radius: 20px;
+    padding: 40px 30px;
+    box-shadow:
+      0 0 20px #ffbb00aa,
+      inset 0 0 30px #ff6a00aa;
+  }
+  .btn {
+    background: linear-gradient(90deg, #ffd700, #ff6a00);
+    border: none;
+    padding: 16px 36px;
+    font-size: 1.3rem;
+    font-weight: 700;
+    border-radius: 12px;
+    color: #1a0a00;
+    cursor: pointer;
+    box-shadow:
+      0 0 12px #ffae00,
+      0 0 24px #ff6a00;
+    transition: box-shadow 0.3s ease-in-out;
+    margin: 10px 0;
+    user-select: none;
+  }
+  .btn:hover {
+    box-shadow:
+      0 0 20px #fff700,
+      0 0 40px #ffbb00;
+  }
+  .subtitle {
+    font-size: 1.8rem;
+    color: #ffcc33;
+    margin-bottom: 25px;
+    text-align: center;
+    text-shadow: 0 0 12px #ffae00;
+  }
+  footer {
+    margin-top: auto;
+    margin-bottom: 24px;
+    color: #777;
+    font-size: 0.9rem;
+    font-family: Arial, sans-serif;
+    user-select: none;
+  }
+  /* Responsive */
+  @media (max-width: 600px) {
+    .logo {
+      font-size: 2.5rem;
+      gap: 12px;
+    }
+    .icon {
+      font-size: 2.5rem;
+    }
+    main {
+      padding: 30px 15px;
+    }
+    .btn {
+      font-size: 1rem;
+      padding: 14px 24px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" aria-label="Logo Jackpot City">
+    <span>Jackpot City</span>
+    <span class="icon" role="img" aria-label="Ficha de casino">🎲</span>
+    <span class="icon" role="img" aria-label="Ruleta">🎡</span>
+    <span class="icon" role="img" aria-label="Cartas">🃏</span>
+  </div>
+</header>
+
+<main>
+  <h2 class="subtitle">Tu casino virtual favorito, ¡con los mejores juegos!</h2>
+  <button class="btn" disabled>Tragamonedas (Próximamente)</button>
+  <button class="btn" disabled>Ruleta (Próximamente)</button>
+  <button class="btn" disabled>Cartas (Próximamente)</button>
+</main>
+
+<footer>
+  &copy; 2025 Jackpot City — Juega responsablemente. Se requiere edad legal.
+</footer>
+
+</body>
+</html>
