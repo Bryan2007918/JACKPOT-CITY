@@ -1,0 +1,399 @@
+# Create a ready-to-deploy Next.js + Stripe + Supabase template for "Jackpot City"
+# It will be zipped and provided for download.
+
+import os, json, textwrap, zipfile, pathlib, shutil
+
+base = "/mnt/data/jackpot-city-next"
+if os.path.exists(base):
+    shutil.rmtree(base)
+os.makedirs(base, exist_ok=True)
+
+# Create directories
+dirs = [
+    "lib",
+    "pages",
+    "pages/api",
+    "components",
+    "sql"
+]
+for d in dirs:
+    os.makedirs(os.path.join(base, d), exist_ok=True)
+
+# Files content
+package_json = {
+  "name": "jackpot-city",
+  "version": "1.0.0",
+  "private": True,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "postinstall": "echo 'Ready'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "next": "14.2.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "stripe": "14.25.0"
+  }
+}
+
+next_config = """\
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+};
+module.exports = nextConfig;
+"""
+
+supabase_admin_js = """\
+import { createClient } from '@supabase/supabase-js';
+
+export const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false } }
+);
+"""
+
+index_js = """\
+import { useEffect, useState } from 'react';
+
+function format(n){ return new Intl.NumberFormat().format(n); }
+
+function Slot({ balance, onSpin }){
+  const [reels, setReels] = useState(['🍒','🍋','⭐']);
+  const [bet, setBet] = useState(50);
+  const [spinning, setSpinning] = useState(false);
+
+  async function spin(){
+    if (spinning) return;
+    setSpinning(true);
+    try{
+      const res = await onSpin(bet);
+      if(res.error){ alert(res.error); return; }
+      setReels(res.reels);
+      if (res.win > 0) alert(`¡Ganaste ${format(res.win)} ✨!`);
+    } finally {
+      setTimeout(()=>setSpinning(false), 400);
+    }
+  }
+
+  return (
+    <div style={{background:'rgba(255,255,255,0.04)', borderRadius:12, padding:16, boxShadow:'0 6px 30px rgba(0,0,0,.45)'}}>
+      <h3 style={{marginBottom:10}}>🎰 Tragamonedas</h3>
+      <div style={{display:'flex', gap:10, justifyContent:'center', marginBottom:12}}>
+        {reels.map((r,i)=>(
+          <div key={i} style={{width:90,height:90,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,background:'linear-gradient(180deg,#0d1b2a,#071124)',boxShadow:'inset 0 1px 2px rgba(255,255,255,.06), 0 10px 24px rgba(0,0,0,.5)'}}>{r}</div>
+        ))}
+      </div>
+      <div style={{display:'flex', gap:10, justifyContent:'center', alignItems:'center'}}>
+        <button onClick={()=> setBet(Math.max(10, bet-10))}>-</button>
+        <div style={{padding:'6px 12px', background:'rgba(255,255,255,.06)', borderRadius:8}}>Apuesta: <b>{bet}</b> ✨</div>
+        <button onClick={()=> setBet(Math.min(500, bet+10))}>+</button>
+        <button onClick={spin} disabled={spinning} style={{padding:'10px 14px', borderRadius:10, background:'linear-gradient(90deg,#ffd700,#ff6a00)', color:'#111', fontWeight:800}}>
+          {spinning ? 'Girando...' : 'Girar'}
+        </button>
+      </div>
+      <div style={{opacity:.7, marginTop:8, textAlign:'center'}}>El saldo se actualiza automáticamente después de cada tirada.</div>
+    </div>
+  );
+}
+
+export default function Home(){
+  const [userId, setUserId] = useState('');
+  const [balance, setBalance] = useState(0);
+  const [amount, setAmount] = useState(100);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    let id = localStorage.getItem('JC_USER_ID');
+    if(!id){
+      id = 'U-' + Math.random().toString(36).slice(2,10);
+      localStorage.setItem('JC_USER_ID', id);
+    }
+    setUserId(id);
+  },[]);
+
+  useEffect(()=>{
+    if(!userId) return;
+    (async ()=>{
+      setLoading(true);
+      const res = await fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId }) });
+      const data = await res.json();
+      if (data && typeof data.balance === 'number') setBalance(data.balance);
+      setLoading(false);
+    })();
+  },[userId]);
+
+  async function onSpin(bet){
+    const res = await fetch('/api/spin', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId, bet }) });
+    const data = await res.json();
+    if (!data.error) setBalance(data.balance);
+    return data;
+  }
+
+  async function deposit(){
+    const res = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ amount, userId })
+    });
+    const { url, error } = await res.json();
+    if (error) { alert(error); return; }
+    window.location.href = url;
+  }
+
+  return (
+    <div style={{minHeight:'100vh', background:'linear-gradient(180deg,#0b0f1a,#071027)', color:'#fff', fontFamily:'system-ui,Segoe UI,Roboto,Arial'}}>
+      <header style={{maxWidth:1100, margin:'0 auto', padding:16, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <div style={{display:'flex', alignItems:'center', gap:12}}>
+          <div style={{width:56,height:56,borderRadius:10, background:'linear-gradient(45deg,#ffd700,#ff6a00)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,color:'#111'}}>JC</div>
+          <div>
+            <h1 style={{margin:0}}>Jackpot City</h1>
+            <div style={{opacity:.7}}>Casino Virtual • Depósitos reales (Stripe)</div>
+          </div>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{opacity:.7, fontSize:12}}>Saldo</div>
+          <div style={{fontWeight:800, color:'#ffd86b'}}>{loading ? '...' : format(balance)} ✨</div>
+        </div>
+      </header>
+
+      <main style={{maxWidth:1100, margin:'0 auto', padding:16, display:'grid', gap:16, gridTemplateColumns:'1fr 360px'}}>
+        <section>
+          <div style={{marginBottom:16, padding:16, borderRadius:12, background:'rgba(255,255,255,.03)'}}>
+            <h2>¡Bienvenido!</h2>
+            <p style={{opacity:.8}}>ID: <code>{userId || '...'}</code></p>
+          </div>
+
+          <Slot balance={balance} onSpin={onSpin} />
+
+          <div style={{marginTop:16, padding:16, borderRadius:12, background:'rgba(255,255,255,.03)'}}>
+            <h3>Próximamente</h3>
+            <p style={{opacity:.8}}>🎡 Ruleta • 🃏 Blackjack • 🎲 Dados</p>
+          </div>
+        </section>
+
+        <aside style={{position:'sticky', top:16, height:'max-content'}}>
+          <div style={{padding:16, borderRadius:12, background:'rgba(255,255,255,.03)', marginBottom:16}}>
+            <h3>Recargar saldo</h3>
+            <label style={{display:'block', marginTop:8, marginBottom:8}}>
+              Monto (MXN):
+              <input type="number" min="10" value={amount} onChange={e=>setAmount(parseInt(e.target.value || '0'))}
+                style={{width:'100%', marginTop:6, padding:10, borderRadius:8, background:'rgba(255,255,255,.06)', color:'#fff', border:'1px solid rgba(255,255,255,.1)'}}/>
+            </label>
+            <button onClick={deposit} style={{width:'100%', padding:12, borderRadius:10, background:'linear-gradient(90deg,#ffd700,#ff6a00)', color:'#111', fontWeight:900}}>
+              Depositar con Stripe
+            </button>
+            <p style={{opacity:.7, fontSize:12, marginTop:8}}>Modo prueba hasta completar verificación/licencia.</p>
+          </div>
+        </aside>
+      </main>
+
+      <footer style={{maxWidth:1100, margin:'12px auto', opacity:.7, fontSize:12, padding:16}}>
+        © {new Date().getFullYear()} Jackpot City — Juega responsablemente. Debes cumplir la legislación aplicable para activar pagos en vivo.
+      </footer>
+    </div>
+  );
+}
+"""
+
+api_user_js = """\
+import { supabaseAdmin } from '../../lib/supabaseAdmin';
+
+export default async function handler(req, res){
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { userId } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'Falta userId' });
+
+  // Asegura usuario
+  const { data: existing } = await supabaseAdmin.from('users').select('id,balance').eq('id', userId).single();
+  if (!existing) {
+    await supabaseAdmin.from('users').insert({ id: userId, balance: 0 });
+    return res.status(200).json({ balance: 0 });
+  }
+  return res.status(200).json({ balance: existing.balance || 0 });
+}
+"""
+
+api_spin_js = """\
+import { supabaseAdmin } from '../../lib/supabaseAdmin';
+
+const SYMBOLS = ['🍒','🍋','⭐','💎','🔔'];
+
+function randomSym(){ return SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)]; }
+
+export default async function handler(req, res){
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { userId, bet } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'Falta userId' });
+  const betInt = parseInt(bet || 0, 10);
+  if (!betInt || betInt < 10) return res.status(400).json({ error: 'Apuesta mínima 10' });
+
+  // Obtener balance
+  const { data: user, error } = await supabaseAdmin.from('users').select('balance').eq('id', userId).single();
+  if (error || !user) return res.status(400).json({ error: 'Usuario no existe' });
+  if (user.balance < betInt) return res.status(400).json({ error: 'Saldo insuficiente' });
+
+  // Descontar apuesta
+  const newBalance = user.balance - betInt;
+  await supabaseAdmin.from('users').update({ balance: newBalance }).eq('id', userId);
+  await supabaseAdmin.from('transactions').insert({ user_id: userId, type: 'bet', amount: betInt, provider: 'game', status: 'ok' });
+
+  // Resolver tirada (RNG simple; para producción usa RNG auditado)
+  const reels = [randomSym(), randomSym(), randomSym()];
+  const [a,b,c] = reels;
+  let mult = 0;
+  if (a===b && b===c) mult = (a==='💎') ? 20 : (a==='⭐') ? 10 : 5;
+  else if (a===b || b===c || a===c) mult = 1;
+  const win = mult * betInt;
+
+  let finalBalance = newBalance;
+  if (win > 0) {
+    finalBalance += win;
+    await supabaseAdmin.from('users').update({ balance: finalBalance }).eq('id', userId);
+    await supabaseAdmin.from('transactions').insert({ user_id: userId, type: 'win', amount: win, provider: 'game', status: 'ok' });
+  }
+
+  return res.status(200).json({ reels, win, balance: finalBalance });
+}
+"""
+
+api_checkout_js = """\
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const { amount, userId } = req.body;
+    if (!amount || amount < 10) return res.status(400).json({ error: 'Monto mínimo 10 MXN' });
+    if (!userId) return res.status(400).json({ error: 'Falta userId' });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      currency: 'mxn',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'mxn',
+          product_data: { name: 'Recarga de saldo Jackpot City' },
+          unit_amount: Math.round(amount * 100)
+        },
+        quantity: 1
+      }],
+      metadata: { userId, amount: String(amount) },
+      success_url: `${req.headers.origin}/?status=success`,
+      cancel_url: `${req.headers.origin}/?status=cancel`
+    });
+
+    return res.status(200).json({ url: session.url });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'No se pudo crear el checkout' });
+  }
+}
+"""
+
+api_webhook_js = """\
+import Stripe from 'stripe';
+import { supabaseAdmin } from '../../lib/supabaseAdmin';
+
+export const config = { api: { bodyParser: false } };
+
+function buffer(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const sig = req.headers['stripe-signature'];
+  const buf = await buffer(req);
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook signature verification failed.', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const userId = session.metadata?.userId;
+    const amount = Number(session.metadata?.amount || 0);
+
+    if (userId && amount > 0) {
+      // leemos balance actual
+      const { data: user } = await supabaseAdmin.from('users').select('balance').eq('id', userId).single();
+      const newBal = (user?.balance || 0) + amount;
+      await supabaseAdmin.from('users').update({ balance: newBal }).eq('id', userId);
+      await supabaseAdmin.from('transactions').insert({
+        user_id: userId, type: 'deposit', amount, provider: 'stripe', status: 'completed'
+      });
+    }
+  }
+
+  res.status(200).json({ received: true });
+}
+"""
+
+schema_sql = """\
+create table if not exists users (
+  id text primary key,
+  balance integer not null default 0,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists transactions (
+  id bigserial primary key,
+  user_id text references users(id) on delete cascade,
+  type text check (type in ('deposit','bet','win','withdraw')) not null,
+  amount integer not null,
+  provider text,
+  status text,
+  created_at timestamp with time zone default now()
+);
+"""
+
+# Write files
+with open(os.path.join(base, "package.json"), "w") as f:
+    json.dump(package_json, f, indent=2)
+with open(os.path.join(base, "next.config.js"), "w") as f:
+    f.write(next_config)
+with open(os.path.join(base, "lib/supabaseAdmin.js"), "w") as f:
+    f.write(supabase_admin_js)
+with open(os.path.join(base, "pages/index.js"), "w") as f:
+    f.write(index_js)
+with open(os.path.join(base, "pages/api/user.js"), "w") as f:
+    f.write(api_user_js)
+with open(os.path.join(base, "pages/api/spin.js"), "w") as f:
+    f.write(api_spin_js)
+with open(os.path.join(base, "pages/api/checkout.js"), "w") as f:
+    f.write(api_checkout_js)
+with open(os.path.join(base, "pages/api/webhook.js"), "w") as f:
+    f.write(api_webhook_js)
+with open(os.path.join(base, "sql/schema.sql"), "w") as f:
+    f.write(schema_sql)
+
+# Zip it
+zip_path = "/mnt/data/jackpot-city-next-template.zip"
+with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as z:
+    for root, dirs, files in os.walk(base):
+        for file in files:
+            full = os.path.join(root, file)
+            arc = os.path.relpath(full, base)
+            z.write(full, arc)
+
+zip_path
